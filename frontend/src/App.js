@@ -14,7 +14,9 @@ function App() {
     name: "",
     description: "",
     price: "",
-    quantity: "",
+    category: "",
+    in_stock: true,
+    rating: "",
   });
   const [editId, setEditId] = useState(null);
   const [message, setMessage] = useState("");
@@ -124,7 +126,7 @@ function App() {
 
   // Reset form
   const resetForm = () => {
-    setForm({ id: "", name: "", description: "", price: "", quantity: "" });
+    setForm({ id: "", name: "", description: "", price: "", category: "", in_stock: true, rating: "" });
     setEditId(null);
   };
 
@@ -148,7 +150,7 @@ function App() {
           ...form,
           id: Number(form.id),
           price: Number(form.price),
-          quantity: Number(form.quantity),
+          rating: Number(form.rating),
         });
         setMessage("Product created successfully");
       }
@@ -167,7 +169,9 @@ function App() {
       name: product.name,
       description: product.description,
       price: product.price,
-      quantity: product.quantity,
+      category: product.category,
+      in_stock: product.in_stock,
+      rating: product.rating,
     });
     setEditId(product.id);
     setMessage("");
@@ -199,7 +203,7 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-badge">📦</span>
-          <h1>Telusko Trac</h1>
+          <h1>Reza Tech</h1>
         </div>
         <div className="top-actions">
           <button className="btn btn-light" onClick={fetchProducts} disabled={loading}>
@@ -260,12 +264,30 @@ function App() {
                 step="0.01"
               />
               <input
-                type="number"
-                name="quantity"
-                placeholder="Quantity"
-                value={form.quantity}
+                type="text"
+                name="category"
+                placeholder="Category"
+                value={form.category}
                 onChange={handleChange}
                 required
+              />
+              <label>
+                In Stock
+                <input
+                  type="checkbox"
+                  name="in_stock"
+                  checked={form.in_stock}
+                  onChange={e => setForm({ ...form, in_stock: e.target.checked })}
+                />
+              </label>
+              <input
+                type="number"
+                name="rating"
+                placeholder="Rating"
+                value={form.rating}
+                onChange={handleChange}
+                required
+                step="0.1"
               />
               <div className="form-actions">
                 <button className="btn" type="submit" disabled={loading}>

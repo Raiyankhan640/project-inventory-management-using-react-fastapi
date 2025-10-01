@@ -1,9 +1,18 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from models import Product
 import database_models
 from database import SessionLocal
+from sqlalchemy.orm import Session
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 database_models.Base.metadata.create_all(bind=SessionLocal().get_bind())
 
@@ -100,6 +109,13 @@ products = [
     )
 ]
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @app.get("/")
 async def read_root():
     return {"Hello": "World"}
@@ -107,6 +123,10 @@ async def read_root():
 @app.on_event("startup")
 def init_db():
     db = SessionLocal()
+    # Delete all existing products
+    db.query(database_models.Product).delete()
+    db.commit()
+    # Insert sample products
     for product in products:
         db_product = database_models.Product(
             id=product.id,
@@ -117,22 +137,52 @@ def init_db():
             in_stock=product.in_stock,
             rating=product.rating
         )
-        db.merge(db_product)  # merge avoids duplicate primary keys
+        db.add(db_product)
     db.commit()
+    print("Products inserted into DB:", db.query(database_models.Product).all())
     db.close()
 
 @app.get("/products")
-async def get_products():
-    # db = session()
-    # products = db.query(database_models.Product).all()
+async def get_products(db: Session = Depends(get_db)):
+    products = db.query(database_models.Product).all()
     return products
 
 @app.get("/products/{product_id}")
-async def get_product(product_id: int):
-    product = next((p for p in products if p.id == product_id), None)
-    return product
+async def get_product(product_id: int, db: Session = Depends(get_db)):
+    db_product = db.query(database_models.Product).filter(database_models.Product.id == product_id).first()
+    if db_product is None:
+        return {"error": "Product not found"}
+    return db_product
 
 @app.post("/products")
-async def create_product(product: Product):
-    products.append(product)
-    return product
+async def create_product(product: Product, db: Session = Depends(get_db)):
+    db_product = database_models.Product(**product.model_dump())
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+    return db_product
+
+@app.put("/products/{product_id}")
+def update_product(product_id: int, product: Product, db: Session = Depends(get_db)):
+    db_product = db.query(database_models.Product).filter(database_models.Product.id == product_id).first()
+    if db_product:
+        db_product.name = product.name
+        db_product.price = product.price
+        db_product.category = product.category
+        db_product.description = product.description
+        db_product.in_stock = product.in_stock
+        db_product.rating = product.rating
+        db.commit()
+        db.refresh(db_product)
+        return db_product
+    else:
+        return {"error": "Product not found"}
+
+@app.delete("/products/{product_id}")
+def delete_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(database_models.Product).filter(database_models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db.delete(product)
+    db.commit()
+    return {"detail": "Product deleted"}
