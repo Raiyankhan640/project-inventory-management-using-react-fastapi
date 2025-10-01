@@ -1,17 +1,12 @@
 from fastapi import FastAPI
 from models import Product
+import database_models
+from database import SessionLocal
+
 app = FastAPI()
 
-@app.get("/")
-async def read_root():
-    return {"Hello": "World"}
+database_models.Base.metadata.create_all(bind=SessionLocal().get_bind())
 
-@app.get("/products")
-async def get_products():
-    return products
-
-
-# Sample product data
 products = [
     Product(
         id=1,
@@ -104,3 +99,40 @@ products = [
         rating=4.6
     )
 ]
+
+@app.get("/")
+async def read_root():
+    return {"Hello": "World"}
+
+@app.on_event("startup")
+def init_db():
+    db = SessionLocal()
+    for product in products:
+        db_product = database_models.Product(
+            id=product.id,
+            name=product.name,
+            price=product.price,
+            category=product.category,
+            description=product.description,
+            in_stock=product.in_stock,
+            rating=product.rating
+        )
+        db.merge(db_product)  # merge avoids duplicate primary keys
+    db.commit()
+    db.close()
+
+@app.get("/products")
+async def get_products():
+    # db = session()
+    # products = db.query(database_models.Product).all()
+    return products
+
+@app.get("/products/{product_id}")
+async def get_product(product_id: int):
+    product = next((p for p in products if p.id == product_id), None)
+    return product
+
+@app.post("/products")
+async def create_product(product: Product):
+    products.append(product)
+    return product
